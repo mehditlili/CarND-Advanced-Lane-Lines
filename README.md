@@ -22,8 +22,12 @@ The goals / steps of this project are the following:
 [image2]: ./output_images/undistorted_pattern.jpg "Undistorted"
 [image3]: ./output_images/original_image.jpg 
 [image4]: ./output_images/filtered_image.jpg  "Warp Example"
-[image5]: ./output_images/warped_cropped.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
+[image5]: ./output_images/warped_color.jpg  "Warp Example"
+[image6]: ./output_images/warped_cropped.jpg "Fit Visual"
+[image7]: ./output_images/roi.jpg 
+[image8]: ./output_images/histogram.jpg 
+[image9]: ./output_images/fitting.jpg 
+[image11]: ./output_images/test0_result.jpg 
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -109,17 +113,37 @@ This resulted in the following source and destination points:
 | 1127, 720     | 960, 720      |
 | 695, 460      | 960, 0        |
 
-I verified that my perspective transform was working as expected by drawing the `src` and `dst` 
-points onto a test image and its warped counterpart to verify that the lines appear parallel 
-in the warped image.
+I verified that my perspective transform was working as expected by drawing the region of interest
+in the original image, then warping that image
+
+Here is the image with its respective region of interest (source points) 
+
+![alt text][image7]
+
+When warped one can see that the yellow ROI edges appear indeed parallel so the perspective
+transform is valid.
 
 ![alt text][image5]
+
+And the result when applying the same warping to the binary image shown above:
+
+![alt text][image6]
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+Once the warped binary image is available, I compute a histogram of intensities by summing
+up all the rows. Expecting lane lines to appear vertical in the warped image, the histogram is 
+expected to have to clearly identifiable maximas. One towards the left of the image and one towards
+the right of the image.
 
-![alt text][image5]
+Here Is an example histogram corresponding to the image above:
+
+
+![alt text][image8]
+
+Running the function 'search_for_lines' on this patch returns 2 degrees polynomial fitting
+to the vertical white blobs found around the histogram maximas.
+The following images shows the white blobs detected at the histogram maxima (red and blue)
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
@@ -127,9 +151,9 @@ I did this in lines # through # in my code in `my_other_file.py`
 
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+Here is an example of my result on a test image:
 
-![alt text][image6]
+![alt text][image11]
 
 ---
 
