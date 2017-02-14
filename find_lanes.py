@@ -26,16 +26,11 @@ Part1:
 read all chessboard images, detect the patterns and compute the camera calibration matrix
 '''
 
-warped_shape = None
-transform = None
-cam = None
-left_fit = None
-roi = None
-right_fit = None
-last_one_good = False
 
 class Camera(object):
-
+    """
+    A Class to handle camera operations (calibration etc)
+    """
     def __init__(self):
         self.debug = False  # display or not the loaded picture
         self.intrinsic = None  # camera matrix
@@ -76,12 +71,11 @@ class Camera(object):
                                                                                  None,
                                                                                  None)
         images = glob.glob(img_path)
-        for fname in images:
-            img = cv2.imread(fname)
-            dst = self.undistort(img)
-            if self.debug:
-                cv2.imshow('undistorted', dst)
-                cv2.waitKey(500)
+        fname = images[0]
+        img = cv2.imread(fname)
+        dst = self.undistort(img)
+        cv2.imwrite('../output_images/undistorted_pattern.jpg', dst)
+        cv2.imwrite('../output_images/original_pattern.jpg', img)
 
     def undistort(self, img):
         if self.intrinsic is not None and self.distortion is not None:
@@ -92,6 +86,9 @@ class Camera(object):
 
 
 class FilterTools(object):
+    """
+    A class containing different static functions offering filtering functionalities
+    """
     @staticmethod
     def mag_thresh(img, sobel_kernel=3, mag_thresh=(0, 255)):
         thresh_min = mag_thresh[0]
@@ -177,7 +174,7 @@ class FilterTools(object):
     def hsv_select(img):
         # Extact yellow and white colors from image and store them in the variable combined
         hsv_image = img
-        # define range of blue and white color in HSV (Im my case due to some codec problem yellow appears as blue in cv2
+        # define range of blue and white color in HSV (blue instead of yellow due to the BGR RGB flip)
         lower_blue = np.array([0, 0, 0])
         upper_blue = np.array([30, 225, 255])
         lower_white = np.array([90, 5, 210])
@@ -196,36 +193,14 @@ class FilterTools(object):
         combined = cv2.erode(combined, kernel, iterations=2)
         return combined
 
-# Define a class to receive the characteristics of each line detection
-class Line():
-    def __init__(self):
-        # was the line detected in the last iteration?
-        self.detected = False
-        # x values of the last n fits of the line
-        self.recent_xfitted = []
-        # average x values of the fitted line over the last n iterations
-        self.bestx = None
-        # polynomial coefficients averaged over the last n iterations
-        self.best_fit = None
-        # polynomial coefficients for the most recent fit
-        self.current_fit = [np.array([False])]
-        # radius of curvature of the line in some units
-        self.radius_of_curvature = None
-        # distance in meters of vehicle center from the line
-        self.line_base_pos = None
-        # difference in fit coefficients between last and new fits
-        self.diffs = np.array([0, 0, 0], dtype='float')
-        # x values for detected line pixels
-        self.allx = None
-        # y values for detected line pixels
-        self.ally = None
-
 
 def search_for_lines(binary_warped, out_img):
     histogram = np.sum(binary_warped[binary_warped.shape[0] / 2:, :], axis=0)
     # Find the peak of the left and right halves of the histogram
     # These will be the starting point for the left and right lines
     midpoint = np.int(histogram.shape[0] / 2)
+    plt.plot(histogram)
+    plt.show()
     leftx_base = np.argmax(histogram[:midpoint])
     rightx_base = np.argmax(histogram[midpoint:]) + midpoint
     # Choose the number of sliding windows
@@ -286,17 +261,30 @@ def search_for_lines(binary_warped, out_img):
     right_fit = np.polyfit(righty, rightx, 2)
     return left_fit, right_fit, left_lane_inds, right_lane_inds
 
+
 def open(image):
-    # Dilate and erode, more iterations for erode to remove single points
+    """
+    Dilate and erode, more iterations for erode to remove single points
+    :param image:
+    :return: dilated then eroded image
+    """
     kernel = np.ones((3, 3), np.uint8)
     combined = cv2.dilate(image, kernel, iterations=3)
     combined = cv2.erode(combined, kernel, iterations=2)
     return combined
 
+
 def predict_lines(binary_warped, left_fit, right_fit):
-    # Assume you now have a new warped binary image
-    # from the next frame of video (also called "binary_warped")
-    # It's now much easier to find line pixels!
+    """
+    Assume you now have a new warped binary image
+    from the next frame of video (also called "binary_warped")
+    It's now much easier to find line pixels!
+    :param binary_warped:
+    :param left_fit:
+    :param right_fit:
+    :return:
+    """
+
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
@@ -320,6 +308,7 @@ def predict_lines(binary_warped, left_fit, right_fit):
     #ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
     #left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     #right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+
 
 def good_lines(left_fit, right_fit):
     print("left fit: %s" % left_fit)
@@ -345,7 +334,6 @@ def find_lines(binary_warped, image, Minv):
     else:
         last_one_good = False
 
-
     # Generate x and y values for plotting
     ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
@@ -359,7 +347,7 @@ def find_lines(binary_warped, image, Minv):
     # plt.xlim(0, 800)
     # plt.ylim(800, 0)
     # plt.show()
-    cv2.imshow("processing", out_img)
+    #cv2.imshow("processing", out_img)
     # Create an image to draw the lines on
     warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
@@ -374,10 +362,8 @@ def find_lines(binary_warped, image, Minv):
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
     # Combine the result with the original image
-    print(image.shape)
-    print(newwarp.shape)
     result = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
-    cv2.imshow("result", result)
+    #cv2.imshow("result", result)
     # cv2.waitKey(5)
     return result
 
@@ -387,17 +373,16 @@ def filter(img):
     cv2.equalizeHist(gray, gray)
     s = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)[:, :, 2]
     #cv2.equalizeHist(s, s)
-    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
-    hsv_thresh = FilterTools.hsv_select(hsv)
-    cv2.imshow("hsv", hsv_thresh*255)
-    print(hsv_thresh)
+    #hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    #hsv_thresh = FilterTools.hsv_select(hsv)
+    #cv2.imshow("hsv", hsv_thresh*255)
     s_sobel_x = FilterTools.abs_sobel_thresh(s, 'x', 7, (20, 100))
     s_sobel_y = FilterTools.abs_sobel_thresh(s, 'y', 7, (10, 100))
     sobel_x = FilterTools.abs_sobel_thresh(gray, 'x', 7, (30, 100))
     sobel_y = FilterTools.abs_sobel_thresh(gray, 'y', 7, (30, 100))
     mag_s_sobel = FilterTools.mag_thresh(s, 3, (10, 20))
     mag_s_sobel = open(mag_s_sobel)
-    cv2.imshow("mag", mag_s_sobel*255)
+    #cv2.imshow("mag", mag_s_sobel*255)
     mag_sobel = FilterTools.mag_thresh(gray, 3, (10, 20))
     mag_sobel = open(mag_s_sobel)
     # cv2.imshow("maggray", mag_sobel*255)
@@ -405,7 +390,7 @@ def filter(img):
     # cv2.imshow("sobel_y", sobel_y*255)
     # cv2.imshow("s_sobel_x", s_sobel_x*255)
     # cv2.imshow("s_sobel_y", s_sobel_y*255)
-    cv2.imshow("gray", gray)
+    #cv2.imshow("gray", gray)
     s_thresh = FilterTools.hls_select(s, (70, 255))
     dir_sobel = FilterTools.dir_threshold(gray, 3, (0.75, 0.8))
     s_dir_sobel = FilterTools.dir_threshold(s, 3, (0.75, 0.8))
@@ -415,8 +400,7 @@ def filter(img):
     combined[intensity == 1 & (((s_sobel_x == 1) & (s_sobel_y == 1)) |
              ((sobel_x == 1) & (sobel_y == 1)) |
              (s_thresh == 1))] = 1
-    cv2.imshow("combined", combined*255)
-    #cv2.waitKey(5)
+    #cv2.imshow("combined", combined*255)
     return combined
 
 
@@ -436,11 +420,13 @@ def display_image(img):
     cv2.waitKey(100)
     return img
 
+
 def draw_roi(img, roi):
     pts = roi.reshape((-1, 1, 2))
     print(pts)
     cv2.polylines(img, [pts.astype(np.int32)], True, (0, 255, 255))
     return img
+
 
 def crop_edges(img, margin):
     img[:, :margin] = 0
@@ -449,56 +435,72 @@ def crop_edges(img, margin):
     img[:, -margin:] = 0
     return img
 
-def pipeline(img):
+
+def pipeline(img, debug=False):
+    """
+    Main function, running the pipeline for road lane detection
+    :param img:
+    :return: image with road lane drawed on it
+    """
     global transform
     global roi
     roi_img = copy.deepcopy(img)
-    roi_shown = draw_roi(roi_img, roi)
-    cv2.namedWindow("roi")
-    cv2.imshow("roi", roi_shown)
+    roi_img = draw_roi(roi_img, roi)
+    # Filter image to get combined set of features
     filtered = filter(img)
+    # Get the birdeye view from top
     warped, undistorted_color = warp(filtered, img)
-    cropped = crop_edges(warped, 50)
+    # Remove edges
+    cropped = crop_edges(warped, 10)
+    # Find lane lines
     result = find_lines(cropped, undistorted_color, np.linalg.inv(transform))
-    cv2.waitKey(5)
+    if debug:
+        cv2.imwrite("../output_images/filtered_image.jpg", filtered*255)
+        cv2.imwrite("../output_images/undistorted_image.jpg", undistorted_color)
+        cv2.imwrite("../output_images/original_image.jpg", img)
+        cv2.imwrite("../output_images/warped_cropped.jpg", cropped*255)
+        cv2.imwrite("../output_images/roi.jpg", roi_img)
+        warped_color, undistorted_color = warp(roi_img, img)
+        cv2.imwrite("../output_images/warped_color.jpg", warped_color)
+
+    #cv2.waitKey(0)
     return result
 
-def main():
-    global cam
-    global transform
-    global warped_shape
-    global roi
-    cam = Camera()
-    cam.read_chessboards('../camera_cal/calibration*.jpg')
-    cam.calibrate_camera('../camera_cal/calibration*.jpg')
-    roi = np.float32([[100, 666], [540, 500], [840, 500], [1230, 666]])
-    warped_shape = np.array([800, 800])
-    target_roi = np.float32([[0, warped_shape[0]], [0, 0], [warped_shape[0], 0], warped_shape])
-    transform = cv2.getPerspectiveTransform(roi, target_roi)
-
-    # # images = glob.glob('/home/mehdi/Udacity/CarND-Advanced-Lane-Lines/test_images/*.jpg')
-    #images = ['/home/mehdi/Udacity/CarND-Advanced-Lane-Lines/test_images/test5.jpg']
-    # for image in images:
-    #     img = cv2.imread(image)
-    #     filter_warp(img)
-
-    videos = glob.glob('/home/mehdi/Udacity/CarND-Advanced-Lane-Lines/*.mp4')
-    counter = 1
-    for video in videos:
-        video = "../challenge_video.mp4"
-        clip1 = VideoFileClip(video)
-        white_clip = clip1.fl_image(pipeline)
-        white_clip.write_videofile("result_"+str(counter)+".mp4", audio=False)
-        counter += 1
-        #lt.show()
-        #cv2.imshow("image", warped * 255)
-        #cv2.waitKey(0)
 
 
+# Initialize variables
+warped_shape = None
+transform = None
+cam = None
+left_fit = None
+roi = None
+right_fit = None
+last_one_good = False
+cam = Camera()  # create a camera instance
+cam.read_chessboards('../camera_cal/calibration*.jpg')
+cam.calibrate_camera('../camera_cal/calibration*.jpg')
 
+# Define a region of interest in the road image
+roi = np.float32([[100, 666], [490, 500], [840, 500], [1230, 666]])
+# Target bird eye view image shape
+warped_shape = np.array([800, 800])
+target_roi = np.float32([[0, warped_shape[0]], [0, 0], [warped_shape[0], 0], warped_shape])
+# Get the perspective transform to apply to all road images
+transform = cv2.getPerspectiveTransform(roi, target_roi)
 
-if __name__=="__main__":
-    main()
+images = glob.glob('../test_images/*.jpg')
+for idx, image in enumerate(images):
+    img = cv2.imread(image)
+    result = pipeline(img, debug=(idx == 0))
+    cv2.imwrite("../output_images/test%s_result.jpg" % idx, result)
+
+exit()
+# My code works only with the project video
+video = "../project_video.mp4"
+clip1 = VideoFileClip(video)
+white_clip = clip1.fl_image(pipeline)
+white_clip.write_videofile("result_project_video.mp4", audio=False)
+
 
 
 
