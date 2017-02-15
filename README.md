@@ -26,8 +26,10 @@ The goals / steps of this project are the following:
 [image6]: ./output_images/warped_cropped.jpg "Fit Visual"
 [image7]: ./output_images/roi.jpg 
 [image8]: ./output_images/histogram.jpg 
-[image9]: ./output_images/fitting.jpg 
+[image9]: ./output_images/detection.jpg 
 [image11]: ./output_images/test0_result.jpg 
+[image12]: ./output_images/test4_result.jpg 
+[image13]: ./output_images/test7_result.jpg 
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -69,11 +71,21 @@ Undistorted Pattern
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
 ![alt text][image3]
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
-I used a combination of color and gradient thresholds to generate a binary image.
 All filtering functions were implemented int he class FilterTools.
 
 A combination of those functions was then used in order to generate an optimal filtered image resulting
-of the combination of filtered image using different methods, intensity based and color based.
+from the combination of filtered image using different methods, in my case intensity based.
+
+I used:
+
+Sobel filter in x and y directions on the S component of the HLS color space
+Sobel filter in x and y directions on the Gray Image
+Thresholding the intensity on the S component of the HLS color space
+Thresholding the intensity on the Gray Image
+
+Then those binary images where combined.
+This was implemented int he function 'filter'
+
 Here's an example of my output for this step.
 
 ![alt text][image4]
@@ -92,26 +104,19 @@ I chose the hardcode the source and destination points
 in the following manner:
 
 ```
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
-
+roi = np.float32([[100, 666], [490, 500], [840, 500], [1230, 666]])
+# Target bird eye view image shape
+warped_shape = np.array([800, 800])
+target_roi = np.float32([[0, warped_shape[0]], [0, 0], [warped_shape[0], 0], warped_shape])
 ```
 This resulted in the following source and destination points:
 
 | Source        | Destination   | 
 |:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
+| 100, 666      | 0, 800        | 
+| 490, 500      | 0, 0          |
+| 840, 500      | 800, 0        |
+| 1230, 666     | 800, 800      |
 
 I verified that my perspective transform was working as expected by drawing the region of interest
 in the original image, then warping that image
@@ -143,11 +148,39 @@ Here Is an example histogram corresponding to the image above:
 
 Running the function 'search_for_lines' on this patch returns 2 degrees polynomial fitting
 to the vertical white blobs found around the histogram maximas.
-The following images shows the white blobs detected at the histogram maxima (red and blue)
+It first starts at the bottom of the image, in a search window around the two peaks of the histogram above
+then keeps propagating upwards, following the displacement of the white blob.
 
+The following images shows the white blobs detected around histogram maxima (red and blue)
+
+![alt text][image9]
+
+The green rectangles represent the search areas for white pixels. Notices how they are centered
+around pixels 150 and 700, matching with the peaks of the histogram shown 
+previously. The sliding window method is simple. Start centered and shift left or right depending
+on the offset between rectangle center and the center of the white blob. If no white pixels are 
+observed, keep the same position and continue with the next rectangle upwards.
+
+The yellow lines are the result of the polynomial fitting.
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+The radius calculation was done as explained in the course, By using the polynomial fit.
+I kept left and right curve radius separated for debugging reasons.
+The values I have got made seemed reasonable.
+The highest radius I have got was in the image with the straight lines. I think here the radius problem
+is not very well conditioned, and the radius estimation can vary a lot when the lane detection varies a little
+bit so I assume 100 kilometers here is a good estimation for infinity
+
+![alt text][image12]
+
+
+Here is another interesting image where we have curved and non curved lanes
+
+![alt text][image13]
+
+The curved yellow left lane had an estimated curvature radius around 3 kilometers while the nearly straight left
+lane had a much higher curvature radius (ca. 20 kilometers).
+
 
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
@@ -169,5 +202,20 @@ Here's a [link to my video result](https://youtu.be/IfYqZVhLC34)
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The approach I took is in itself pretty straight forward.
+It works well for straight roads or roads with low curvatures but fails in other cases
+(especially harder_challenge_video). There is many improvement I see possible:
+
+###Adaptive region of interest:
+in the example of the harder_challenge_video, the position of the car relative to the lanes
+changes a lot. This requires an approach that can update the patch that will be warped from the image
+at each frame. This can be done by taking the lane detection from the previous frame and recompute
+the region of interest such that the lanes end up centered in that roi as much as possible.
+
+###More robust filtering:
+I noticed that dirt or black spots on the street can really affect the accuracy of the 
+lane detection. The combination of filters I came up with doesn't seem to cope well with 
+strong brightness fluctuations as well. Further work can be done here too. Using HSV targeted
+at extracting yellow and white colors could be a good approach (I did that in the first project)
+
 
